@@ -1,0 +1,44 @@
+name: Run Solana Script Every 4 Hours
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"   # هر 4 ساعت (بر مبنای UTC)
+  workflow_dispatch:         # اجرای دستی از تب Actions
+
+permissions:
+  contents: write            # اجازه‌ی push تغییرات CSV
+
+concurrency:
+  group: update-csv
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install requests; fi
+
+      - name: Run script
+        run: python main.py
+
+      - name: Commit CSV changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pairs_liquidity.csv
+          git diff --cached --quiet && echo "No changes to commit" || git commit -m "Auto update CSV at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          git push
